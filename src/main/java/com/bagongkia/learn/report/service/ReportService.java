@@ -1,0 +1,166 @@
+package com.bagongkia.learn.report.service;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.io.FilenameUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.bagongkia.learn.report.model.ExitItem;
+import com.bagongkia.learn.report.model.Income;
+import com.bagongkia.learn.report.model.LostItem;
+import com.bagongkia.learn.report.model.Order;
+import com.bagongkia.learn.report.model.Payment;
+import com.bagongkia.learn.report.model.ReturnedItem;
+import com.bagongkia.learn.report.model.Sale;
+
+@Service
+public class ReportService {
+	
+	@Autowired
+	private FileStorageService fileStorageService;
+	
+	@Autowired
+	private FileReader fileReader;
+	
+	@Autowired
+	private FileReaderV3 fileReaderV3;
+	
+	@Autowired
+	private FileReaderV4 fileReaderV4;
+	
+	@Autowired
+	private LostItemsFileWriter lostItemsFileWriter;
+	
+	@Autowired
+	private LostOrdersFileWriter lostOrdersFileWriter;
+	
+	@Autowired
+	private LostOrdersFileWriterV3 lostOrdersFileWriterV3;
+	
+	@Autowired
+	private LostOrdersFileWriterV4 lostOrdersFileWriterV4;
+	
+	@Autowired
+	private InvoiceWriter invoiceWriter;
+	
+	public void storeLostItemsFile(MultipartFile file) throws IOException {
+		//TODO: VALIDATION
+		fileStorageService.storeFile(file, "lost-items-report.xlsx");
+	}
+	
+	public void storeSalesFile(MultipartFile file) throws IOException {
+		//TODO: VALIDATION
+		fileStorageService.storeFile(file, "sales-report.csv");
+	}
+	
+	public void storePaymentFile(MultipartFile file) throws IOException {
+		//TODO: VALIDATION
+		fileStorageService.storeFile(file, "payment-report.csv");
+	}
+	
+	public void storeReturnedItemFile(MultipartFile file) throws IOException {
+		//TODO: VALIDATION
+		fileStorageService.storeFile(file, "returned-items-report.xlsx");
+	}
+	
+	public void storeStockOutFile(MultipartFile file) throws IOException {
+		//TODO: VALIDATION
+		fileStorageService.storeFile(file, "stock-out-report.xlsx");
+	}
+
+	public Resource getUnprintedInvoiceReport() {
+		return fileStorageService.getFile("unprinted-invoice-report.xlsx");
+	}
+
+	public Resource getMultiplePrintedInvoiceReport() {
+		return fileStorageService.getFile("multiple-printed-invoice-report.xlsx");
+	}
+
+	public Resource getLostItemsReport() {
+		return fileStorageService.getFile("lost-items-report.xlsx");
+	}
+	
+	public void generateLostItemsReport(MultipartFile salesFile, MultipartFile paymentFile, 
+			MultipartFile returnedItemsFile, MultipartFile lostItemsFile) throws Exception {
+		List<Sale> sales = fileReader.readSalesFile(salesFile.getInputStream(), FilenameUtils.getExtension(salesFile.getOriginalFilename()));
+		List<Payment> payments = fileReader.readPaymentFile(paymentFile.getInputStream());
+		List<ReturnedItem> returnedItems = new ArrayList<>();
+		if (returnedItemsFile != null) {
+			returnedItems = fileReader.readReturnedItemsFile(returnedItemsFile.getInputStream());
+		}
+		List<LostItem> lostItems = new ArrayList<>();
+		if (lostItemsFile != null) {
+			lostItems = fileReader.readLostItemsFile(lostItemsFile.getInputStream());
+		}
+		lostItemsFileWriter.write(lostItems, sales, payments, returnedItems);
+	}
+
+	public void generateInvoiceReport(MultipartFile salesFile, MultipartFile exitItemsFile) throws Exception {
+		List<Sale> sales = fileReader.readSalesFile(salesFile.getInputStream(), FilenameUtils.getExtension(salesFile.getOriginalFilename()));
+		List<ExitItem> exitItems = fileReader.readExitItemsFile(exitItemsFile.getInputStream());
+		invoiceWriter.writeUnprintedInvoice(sales, exitItems);
+		invoiceWriter.writeMultiplePrintedInvoice(sales, exitItems);
+	}
+	
+	public void generateLostOrdersReport(MultipartFile orderFile, MultipartFile incomeFile, 
+			MultipartFile returnedItemsFile, MultipartFile lostOrdersFile) throws Exception {
+		List<Order> orders = fileReader.readOrderFile(orderFile.getInputStream());
+		List<Income> incomes = fileReader.readIncomeFile(incomeFile.getInputStream());
+		List<ReturnedItem> returnedItems = new ArrayList<>();
+		if (returnedItemsFile != null) {
+			returnedItems = fileReader.readReturnedItemsFile(returnedItemsFile.getInputStream());
+		}
+		List<Order> lostOrders = new ArrayList<>();
+		if (lostOrdersFile != null) {
+			lostOrders = fileReader.readLostOrdersFile(lostOrdersFile.getInputStream());
+		}
+		lostOrdersFileWriter.write(lostOrders, orders, incomes, returnedItems);
+	}
+	
+	public Resource getLostOrdersReport() {
+		return fileStorageService.getFile("lost-orders-report.xlsx");
+	}
+	
+	public void generateLostOrdersReportV3(MultipartFile orderFile, MultipartFile incomeFile, 
+			MultipartFile returnedItemsFile, MultipartFile lostOrdersFile) throws Exception {
+		List<Order> orders = fileReaderV3.readOrderFile(orderFile.getInputStream());
+		List<Income> incomes = fileReaderV3.readIncomeFile(incomeFile.getInputStream());
+		List<ReturnedItem> returnedItems = new ArrayList<>();
+		if (returnedItemsFile != null) {
+			returnedItems = fileReaderV3.readReturnedItemsFile(returnedItemsFile.getInputStream());
+		}
+		List<Order> lostOrders = new ArrayList<>();
+		if (lostOrdersFile != null) {
+			lostOrders = fileReaderV3.readLostOrdersFile(lostOrdersFile.getInputStream());
+		}
+		lostOrdersFileWriterV3.write(lostOrders, orders, incomes, returnedItems);
+	}
+	
+	public Resource getLostOrdersReportV3() {
+		return fileStorageService.getFile("lost-orders-report-v3.xlsx");
+	}
+	
+	public void generateLostOrdersReportV4(MultipartFile orderFile, MultipartFile incomeFile, 
+			MultipartFile returnedItemsFile, MultipartFile lostOrdersFile) throws Exception {
+		List<Order> orders = fileReaderV4.readOrderFile(orderFile.getInputStream());
+		List<Income> incomes = fileReaderV4.readIncomeFile(incomeFile.getInputStream());
+		List<ReturnedItem> returnedItems = new ArrayList<>();
+		if (returnedItemsFile != null) {
+			returnedItems = fileReaderV4.readReturnedItemsFile(returnedItemsFile.getInputStream());
+		}
+		List<Order> lostOrders = new ArrayList<>();
+		if (lostOrdersFile != null) {
+			lostOrders = fileReaderV4.readLostOrdersFile(lostOrdersFile.getInputStream());
+		}
+		lostOrdersFileWriterV4.write(lostOrders, orders, incomes, returnedItems);
+	}
+	
+	public Resource getLostOrdersReportV4() {
+		return fileStorageService.getFile("lost-orders-report-v4.xlsx");
+	}
+}

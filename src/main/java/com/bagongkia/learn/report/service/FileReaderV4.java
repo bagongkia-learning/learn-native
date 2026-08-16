@@ -1,0 +1,345 @@
+package com.bagongkia.learn.report.service;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.poi.EncryptedDocumentException;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.bagongkia.learn.report.ReportException;
+import com.bagongkia.learn.report.model.Income;
+import com.bagongkia.learn.report.model.LostItem;
+import com.bagongkia.learn.report.model.Order;
+import com.bagongkia.learn.report.model.ReturnedItem;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+public class FileReaderV4 {
+	
+	@Autowired
+	private FileStorageService fileStorageService;
+	
+	private int convertColumnToIndex(String column) {
+		int n = 0;
+		for (int i = 1; i <= column.length(); i++) {
+			char c =  column.toUpperCase().charAt(column.length() - i);
+		    n += (c - 'A' + 1) * Math.pow(26, i - 1);
+		}
+		return n - 1;
+	}	
+
+	public List<ReturnedItem> readReturnedItemsFile(InputStream inputStream) throws EncryptedDocumentException, IOException, ReportException {
+		List<ReturnedItem> returnedItems = new ArrayList<>();
+		Workbook workbook = WorkbookFactory.create(inputStream);
+		try {
+			Iterator<Sheet> sheetIterator = workbook.iterator();
+			while (sheetIterator.hasNext()) {
+				Sheet sheet = sheetIterator.next();
+				Iterator<Row> rowIterator = sheet.iterator();
+			    while (rowIterator.hasNext()) {
+			    	Row row = rowIterator.next();
+			        Iterator<Cell> cellIterator = row.cellIterator();
+			        while (cellIterator.hasNext()) {
+			        	Cell cell = cellIterator.next();
+			            ReturnedItem item = new ReturnedItem();
+			            try {
+			            	try {
+			            		item.setTrackingCode(cell.getStringCellValue());
+			            	} catch (IllegalStateException e) {
+			            		BigDecimal trackingCode = new BigDecimal(cell.getNumericCellValue());
+				            	if (trackingCode.compareTo(BigDecimal.ZERO) > 0) {
+				            		item.setTrackingCode(trackingCode.toPlainString());
+				            	}
+			            	}
+			            } catch (IllegalStateException e) {
+			            	throw new ReportException("PLEASE RECHECK SHEET (" + sheet.getSheetName() + ") ON CELL " + cell.getAddress(), e);
+			            }
+			            returnedItems.add(item);
+			        }
+		        }
+			}
+		} finally {
+			workbook.close();
+		}
+		log.info("Returned Items Records size: {}", returnedItems.size());
+		return returnedItems;
+	}
+	
+	public List<LostItem> readLostItemsFile(InputStream inputStream) throws EncryptedDocumentException, IOException, ReportException {
+		List<LostItem> lostItems = new ArrayList<>();
+		Workbook workbook = WorkbookFactory.create(inputStream);
+		try {
+			Iterator<Sheet> sheetIterator = workbook.iterator();
+			while (sheetIterator.hasNext()) {
+				Sheet sheet = sheetIterator.next();
+				Iterator<Row> rowIterator = sheet.iterator();
+				rowIterator.next();
+		        while (rowIterator.hasNext()) {
+		            Row row = rowIterator.next();
+		            
+		            try {
+			            LostItem item = new LostItem();
+			            Cell cell1 = row.getCell(1, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+			            Cell cell2 = row.getCell(2, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+			            try {
+			            	item.setOrderNumber(cell1.getStringCellValue());
+			            } catch (IllegalStateException e) {
+			            	BigDecimal orderNumber = new BigDecimal(cell1.getNumericCellValue());
+			            	if (orderNumber.compareTo(BigDecimal.ZERO) > 0) {
+			            		item.setOrderNumber(orderNumber.toPlainString());
+			            	}
+			            }
+			            try {
+			            	item.setTrackingCode(cell2.getStringCellValue());
+			            } catch (IllegalStateException e) {
+			            	BigDecimal trackingCode = new BigDecimal(cell2.getNumericCellValue());
+			            	if (trackingCode.compareTo(BigDecimal.ZERO) > 0) {
+			            		item.setTrackingCode(trackingCode.toPlainString());
+			            	}
+			            }
+			            
+			            Cell cell3 = row.getCell(3, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+			            item.setPaidAmount(new BigDecimal(cell3.getNumericCellValue()));
+			            if (item.getOrderNumber() != null && !item.getOrderNumber().isEmpty()) {
+			            	lostItems.add(item);
+			            }
+		            } catch (IllegalStateException e) {
+		            	throw new ReportException("PLEASE RECHECK SHEET (" + sheet.getSheetName() + ") ON ROW " + row.getRowNum(), e);		            	
+		            }
+		        }
+			}
+		} finally {
+			workbook.close();
+		}
+		log.info("Lost Items Records size: {}", lostItems.size());
+		return lostItems;
+	}
+
+	public List<Order> readOrderFile(InputStream inputStream) throws IOException, ReportException {
+		List<Order> orderList = new ArrayList<>();
+		Map<String, String> configMap = fileStorageService.getConfig();
+		int orderNoIndex = convertColumnToIndex(configMap.get("laporan.order-v4.no-pesanan"));
+        int orderStatusIndex = convertColumnToIndex(configMap.get("laporan.order-v4.status-pesanan"));
+        int orderResiIndex = convertColumnToIndex(configMap.get("laporan.order-v4.no-resi"));
+        int orderPaymentDateIndex = convertColumnToIndex(configMap.get("laporan.order-v4.waktu-pembayaran"));
+        int orderTotalPriceIndex = convertColumnToIndex(configMap.get("laporan.order-v4.total-harga-produk"));
+		
+		Workbook workbook = WorkbookFactory.create(inputStream);
+		try {
+			Iterator<Sheet> sheetIterator = workbook.iterator();
+			int i = 0;
+			if (sheetIterator.hasNext()) {
+				Sheet sheet = sheetIterator.next();
+				Iterator<Row> rowIterator = sheet.iterator();
+				int rowNum = 0;
+			    while (rowIterator.hasNext()) {
+			    	Row row = rowIterator.next();
+			        Iterator<Cell> cellIterator = row.cellIterator();
+			        i = 0;
+			        if (++rowNum > 1) {
+				        Order order = new Order();
+				        while (cellIterator.hasNext()) {
+				        	Cell cell = cellIterator.next();
+				            try {
+	//			            	try {
+				            		if (i == orderNoIndex) {
+				            			order.setOrderNumber(getStringValueFromCell(cell));
+				            		} else if (i == orderStatusIndex) {
+				            			order.setOrderStatus(getStringValueFromCell(cell));
+				            		} else if (i == orderResiIndex) {
+				            			order.setResiNumber(getStringValueFromCell(cell));
+				            		} else if (i == orderPaymentDateIndex) {
+					            		order.setPaymentDate(getStringValueFromCell(cell));
+				            		} else if (i == orderTotalPriceIndex) {
+				            			order.setTotalProductPrice(getStringValueFromCell(cell));
+				            		}
+	//			            	} catch (IllegalStateException e) {
+	//			            		BigDecimal trackingCode = new BigDecimal(cell.getNumericCellValue());
+	//				            	if (trackingCode.compareTo(BigDecimal.ZERO) > 0) {
+	//				            		item.setTrackingCode(trackingCode.toPlainString());
+	//				            	}
+	//			            	}
+				            } catch (IllegalStateException e) {
+				            	throw new ReportException("PLEASE RECHECK SHEET (" + sheet.getSheetName() + ") ON CELL " + cell.getAddress(), e);
+				            }
+				            i++;
+				        }
+				        if (order.getOrderNumber() != null && !order.getOrderNumber().isEmpty()) {
+				        	orderList.add(order);
+				        }
+			        }
+		        }
+			}
+		} finally {
+			workbook.close();
+		}
+		log.info("Order List Records size: {}", orderList.size());
+		return orderList;
+	}
+	
+	public List<Income> readIncomeFile(InputStream inputStream) throws IOException, ReportException {
+		List<Income> incomeList = new ArrayList<>();
+		Map<String, String> configMap = fileStorageService.getConfig();
+		int orderNoIndex = convertColumnToIndex(configMap.get("laporan.income-v4.no-pesanan"));
+        int amountIndex = convertColumnToIndex(configMap.get("laporan.income-v4.total-penghasilan"));
+        int sheetIndex = Integer.valueOf(configMap.get("laporan.income-v4.sheet-index"));
+		Workbook workbook = WorkbookFactory.create(inputStream);
+		try {
+//			Iterator<Sheet> sheetIterator = workbook.iterator();
+//			int i = 0;
+//			if (sheetIterator.hasNext()) {
+//				Sheet sheet = sheetIterator.next();
+			
+			Sheet sheet = workbook.getSheetAt(sheetIndex - 1);
+			Iterator<Row> rowIterator = sheet.iterator();
+			int rowNum = 0;
+		    while (rowIterator.hasNext()) {
+		    	Row row = rowIterator.next();
+		        Iterator<Cell> cellIterator = row.cellIterator();
+		        int i = 0;
+		        if (++rowNum > 6) {
+			        Income income = new Income();
+			        while (cellIterator.hasNext()) {
+			        	Cell cell = cellIterator.next();
+			            try {
+		            		if (i == orderNoIndex) {
+		            			income.setOrderNumber(getStringValueFromCell(cell));
+		            		} else if (i == amountIndex) {
+		            			try {
+		            				Pattern p1 = Pattern.compile("[\\d]+");
+			            			Matcher m1 = p1.matcher(cell.getStringCellValue());
+			            			if (m1.find()) {
+			            				income.setAmount(parseBigDecimal(m1.group()));
+			            			} else {
+			            				income.setAmount(BigDecimal.ZERO);
+			            			}
+		            			} catch (IllegalStateException e) {
+		            				BigDecimal amount = new BigDecimal(cell.getNumericCellValue());
+		            				income.setAmount(amount);
+		            			}
+		            		}
+			            } catch (IllegalStateException e) {
+			            	throw new ReportException("PLEASE RECHECK SHEET (" + sheet.getSheetName() + ") ON CELL " + cell.getAddress(), e);
+			            }
+			            i++;
+			        }
+			        incomeList.add(income);
+		        }
+	        }
+//			}
+		} finally {
+			workbook.close();
+		}
+		log.info("Income List Records size: {}", incomeList.size());
+		return incomeList;
+	}
+	
+	public List<Order> readLostOrdersFile(InputStream inputStream) throws IOException, ReportException {
+		List<Order> orderList = new ArrayList<>();
+		Workbook workbook = WorkbookFactory.create(inputStream);
+		
+		Map<String, String> configMap = fileStorageService.getConfig();
+		int orderNoIndex = convertColumnToIndex(configMap.get("laporan.barang-hilang-v4.no-pesanan"));
+		int resiNoIndex = convertColumnToIndex(configMap.get("laporan.barang-hilang-v4.no-resi"));
+		int paymentDateIndex = convertColumnToIndex(configMap.get("laporan.barang-hilang-v4.waktu-pembayaran"));
+		int totalPriceIndex = convertColumnToIndex(configMap.get("laporan.barang-hilang-v4.total-harga"));
+		int orderStatusIndex = convertColumnToIndex(configMap.get("laporan.barang-hilang-v4.status-pesanan"));
+		try {
+			Iterator<Sheet> sheetIterator = workbook.iterator();
+			int i = 0;
+			if (sheetIterator.hasNext()) {
+				Sheet sheet = sheetIterator.next();
+				Iterator<Row> rowIterator = sheet.iterator();
+				int rowNum = 0;
+			    while (rowIterator.hasNext()) {
+			    	Row row = rowIterator.next();
+			    	if (++rowNum > 1) {
+				        Iterator<Cell> cellIterator = row.cellIterator();
+				        i = 0;
+				        Order order = new Order();
+				        while (cellIterator.hasNext()) {
+				        	Cell cell = cellIterator.next();
+				            try {
+			            		if (i == orderNoIndex) {
+			            			order.setOrderNumber(getStringValueFromCell(cell));
+			            		} else if (i == resiNoIndex) {
+			            			order.setResiNumber(getStringValueFromCell(cell));
+			            		} else if (i == paymentDateIndex) {
+				            		order.setPaymentDate(getStringValueFromCell(cell));
+			            		} else if (i == totalPriceIndex) {
+			            			order.setTotalProductPrice(getStringValueFromCell(cell));
+			            		} else if (i == orderStatusIndex) {
+			            			order.setOrderStatus(getStringValueFromCell(cell));
+			            		}
+				            } catch (IllegalStateException e) {
+				            	throw new ReportException("PLEASE RECHECK SHEET (" + sheet.getSheetName() + ") ON CELL " + cell.getAddress(), e);
+				            }
+				            i++;
+				        } 
+				        if (order.getOrderNumber() != null && !order.getOrderNumber().isEmpty()) {
+				        	orderList.add(order);
+				        }
+			    	}
+		        }
+			}
+		} finally {
+			workbook.close();
+		}
+		log.info("Lost Order List Records size: {}", orderList.size());
+		return orderList;
+	}
+	
+	private String getStringValueFromCell(Cell cell) {
+		try {
+			return cell.getStringCellValue();
+		} catch (IllegalStateException e) {
+			return String.valueOf(cell.getNumericCellValue());
+		}
+	}
+	
+	private BigDecimal parseBigDecimal(String value) {
+		try {
+			final DecimalFormatSymbols symbols = new DecimalFormatSymbols();
+			symbols.setGroupingSeparator('.');
+			symbols.setDecimalSeparator(',');
+			String pattern = "#.##0,0#";
+			
+			final DecimalFormat decimalFormat = new DecimalFormat(pattern, symbols);
+			decimalFormat.setParseBigDecimal(true);
+			
+			return (BigDecimal) decimalFormat.parse(value);
+		} catch (ParseException |IllegalArgumentException e) {
+			try {
+				final DecimalFormatSymbols symbols = new DecimalFormatSymbols();
+				symbols.setGroupingSeparator(',');
+				symbols.setDecimalSeparator('.');
+				String pattern = "#,##0.0#";
+				
+				final DecimalFormat decimalFormat = new DecimalFormat(pattern, symbols);
+				decimalFormat.setParseBigDecimal(true);
+				
+				return (BigDecimal) decimalFormat.parse(value);
+			} catch (ParseException |IllegalArgumentException e1) {
+				return new BigDecimal(value);
+			}
+		}
+	}
+}

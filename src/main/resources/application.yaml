@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: learn-learn
+  servlet.multipart:
+    max-file-size: '200MB'
+    max-request-size: '200MB'
+
+logging:
+  level:
+    root: 'INFO'
+    com.bagongkia: 'INFO'
+  file:
+    name: 'log/application.log'
+    max-history: '30'
+
+server.port: 43000
