@@ -36,7 +36,7 @@ jobs:
           
       - name: 'Build Native Image'
         run: |
-          ./mvnw -Pnative package -DskipTests 
+          ./mvnw -Pnative -DskipTests native:compile
           
       - name: 'List Target'
         run: |
@@ -44,14 +44,14 @@ jobs:
           
       - name: 'Change mode'
         run: |
-          chmod 755 target/learn-native-0.0.1-SNAPSHOT
+          chmod 755 target/stev-report
           
       - name: 'Publish Native Image'
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: 'stev-report'
-          path: target/learn-native-0.0.1-SNAPSHOT
+          path: target/stev-report
           
       - name: 'Create Release and Upload Asset'
         uses: softprops/action-gh-release@v2
@@ -59,7 +59,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
         with:
-          files: target/learn-native-0.0.1-SNAPSHOT
+          files: target/stev-report
           name: Release ${{github.ref_name}}
           body: |
             Initial release
