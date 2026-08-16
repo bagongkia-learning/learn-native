@@ -19,6 +19,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.util.IOUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -196,6 +197,8 @@ public class FileReaderV4 {
 	}
 	
 	public List<Income> readIncomeFile(InputStream inputStream) throws IOException, ReportException {
+		IOUtils.setByteArrayMaxOverride(Integer.MAX_VALUE); 
+
 		List<Income> incomeList = new ArrayList<>();
 		Map<String, String> configMap = fileStorageService.getConfig();
 		int orderNoIndex = convertColumnToIndex(configMap.get("laporan.income-v4.no-pesanan"));

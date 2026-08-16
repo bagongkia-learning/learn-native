@@ -55,16 +55,18 @@ jobs:
           
       - name: 'Create Release and Upload Asset'
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
         with:
-          files: target/stev-report
+          tag_name: ${{ github.ref_name }}
           name: Release ${{github.ref_name}}
           body: |
             Initial release
           draft: false
           prerelease: false
+          files: |
+            target/stev-report
+            target/report.properties
 
       - name: 'Write Upload URL To File'
         run: |
