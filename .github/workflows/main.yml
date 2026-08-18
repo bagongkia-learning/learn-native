@@ -1,4 +1,5 @@
 name: stev-report
+
 on:
   push:
     tags:
@@ -7,18 +8,18 @@ on:
       - 'main'
 
 jobs:
-  build-non-windows-image:
-    name: 'Build Non-Windows Image'
+  build-windows-image:
+    name: 'Build Windows Image'
     strategy:
       matrix:
-        os: ['macos-latest']
+        os: ['windows-latest']
         include:
-          - os: 'macos-latest'
-            label: 'mac'
-    runs-on: ${{matrix.os}}
+          - os: 'windows-latest'
+            label: 'windows'
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
-
+      
     steps:
       - name: 'Checkout'
         uses: actions/checkout@v4
@@ -29,43 +30,35 @@ jobs:
           java-version: '25'
           distribution: 'graalvm'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: 'Change Maven Mode'
-        run: |
-          chmod 755 mvnw
-          
+
       - name: 'Build Native Image'
         run: |
-          ./mvnw -Pnative -DskipTests native:compile
-          
+          .\mvnw.cmd -Pnative -DskipTests native:compile
+
       - name: 'List Target'
         run: |
-          ls target
-          
-      - name: 'Change mode'
-        run: |
-          chmod 755 target/stev-report
-          
+          Get-ChildItem target
+
       - name: 'Publish Native Image'
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: 'stev-report'
-          path: target/stev-report
-          
+          path: target/stev-report.exe
+
       - name: 'Create Release and Upload Asset'
         uses: softprops/action-gh-release@v2
         env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref_name }}
-          name: Release ${{github.ref_name}}
+          name: Release ${{ github.ref_name }}
           body: |
-            Initial release
+            Initial Windows release
           draft: false
           prerelease: false
           files: |
-            target/stev-report
+            target/stev-report.exe
             target/report.properties
 
       - name: 'Write Upload URL To File'
@@ -77,5 +70,3 @@ jobs:
         with:
           name: 'upload_url.txt'
           path: 'upload_url.txt'
-          
-      
