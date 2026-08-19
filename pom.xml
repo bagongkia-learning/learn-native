@@ -84,8 +84,8 @@
 					<buildArgs>
 						<arg>-H:+AddAllCharsets</arg>
 						<arg>--initialize-at-run-time=org.apache.logging.log4j.spi.Provider</arg>
-						<arg>
-							--initialize-at-run-time=org.apache.commons.compress.archivers.zip.ZipFile</arg>
+						<arg>--initialize-at-run-time=org.apache.commons.compress.archivers.zip.ZipFile</arg>
+						<buildArg>--initialize-at-build-time=org.apache.poi,org.apache.xmlbeans</buildArg>
 					</buildArgs>
 				</configuration>
 			</plugin>
