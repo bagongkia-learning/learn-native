@@ -83,7 +83,7 @@
 					</metadataRepository>
 					<buildArgs>
 						<buildArg>-H:+AddAllCharsets</buildArg>
-						<buildArg>--initialize-at-build-time=org.apache.poi,org.apache.xmlbeans,org.apache.logging.log4j,org.apache.logging.slf4j,org.slf4j,ch.qos.logback,org.springframework.boot.logging</buildArg>
+						<buildArg>--initialize-at-build-time=org.apache.poi,org.apache.xmlbeans,org.apache.logging.log4j,org.apache.logging.slf4j,org.slf4j,ch.qos.logback,org.springframework.boot.logging,org.springframework.boot.ansi,org.springframework.boot.logging.logback</buildArg>
 						<buildArg>--initialize-at-run-time=org.apache.logging.log4j.spi.Provider,org.apache.commons.compress.archivers.zip.ZipFile,org.apache.commons.compress.utils.IOUtils</buildArg>
 					</buildArgs>
 				</configuration>
